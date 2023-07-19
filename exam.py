@@ -41,14 +41,24 @@ import arviz as az   # type: ignore
 #
 # Load the data in a Pandas dataframe.
 
-pass
+data = pd.read_csv('trillium.csv')
+data.head()
 
 # ### Exercise 2 (max 2 points)
 #
 # Add a column `Location` with the complete name of the site where the sample was collected.
 #
 
-pass
+data['Location'] = data['Site'].map({
+    'TB': 'Tilton Bridge',
+    'PB': 'Pocket Branch',
+    'OM': 'Old Mine',
+    'CA': 'Cave',
+    'WF': 'WhiteWater Falls',
+    'BR': 'Boat Ramp',
+    'JG': 'Jocassee Gorges',
+})
+
 
 # ### Exercise 3 (max 7 points)
 #
@@ -57,7 +67,28 @@ pass
 #
 # To get the full marks, you should declare correctly the type hints and add a test within a doctest string.
 
-pass
+# +
+def averages(values: list[float]) -> list[float]:
+    """Return the list of averages on the triplet of the ordered values of the input list.
+    
+    >>> np.isclose(averages([6.0, 1.0, 5.0, 2.0, 4.0, 3.0]), [2.0, 5.0]).all()
+    True
+    
+    >>> np.isclose(averages([6.0, 1.0, 5.0, 2.0, 4.0]), [7/3, 5.5]).all()
+    True
+    
+    """
+    
+    ordered = sorted(values)
+    ris: list[float] = []
+    i = 0
+    while i < len(ordered):
+        ris.append(float(np.mean(ordered[i:i+3])))
+        i += 3
+    return ris
+    
+    
+    
 
 # +
 # You can test your docstrings by uncommenting the following two lines
@@ -70,25 +101,30 @@ doctest.testmod()
 #
 # Apply the function defined in Exercise 3 on the values of `Citrulline` collected at "Tilton Bridge".
 
-pass
+averages(data[data['Site'] == 'TB']['Citrulline'].tolist())
 
 # ### Exercise 5 (max 5 points)
 #
 # Add a column to the data with, for each row, the highest value of all the chemical compounds identified using Liquid-chromatography mass spectrometry.
 
-pass
+data['maximal'] = data[[c for c in data.columns[4:] if data[c].dtype == float]].apply(lambda row: max(row), axis=1)
 
 # ### Exercise 6 (max 4 points)
 #
 # Plot together the histograms of `Citrulline` for each collection site.
 
-pass
+fig, ax = plt.subplots(1)
+for c in data['Site'].unique():
+    ax.hist(data[data['Site'] == c]['Citrulline'], density=True, bins='auto', label=c)
+_ = ax.legend()
+
 
 # ### Exercise 7 (max 4 points)
 #
 # Make a scatter plot of `Citrulline` vs. `S-Adenosyl-L-methioninamine`. Color the points according to the `Status`.
 
-pass
+_ = data.plot.scatter('Citrulline', 'S-Adenosyl-L-methioninamine', 
+                    c=data['Status'].map({'endemic': 'red', 'widespread': 'blue'}))
 
 # ### Exercise 8 (max 5 points)
 #
@@ -104,4 +140,17 @@ pass
 #
 #
 
-pass
+with pm.Model() as m:
+    alpha = pm.Normal('alpha', mu=0, sigma=1)
+    beta = pm.Normal('beta', mu=0, sigma=1)
+    gamma = pm.Exponential('gamma', lam=1)
+    
+    citrulline = pm.Normal('citrulline', sigma=gamma, mu=alpha + beta*data['S-Adenosyl-L-methioninamine'], 
+                           observed=data['Citrulline'])
+
+with m:
+    idata = pm.sample(random_seed=10292)
+
+_ = az.plot_posterior(idata)
+
+
